@@ -16,7 +16,7 @@ interface IIDOLauncher { // Minimal interface for external IDO contracts
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";               // ERC20 interface
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";      // Safe ERC20 operations
 import "@openzeppelin/contracts/access/Ownable.sol";                    // Ownership control
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";         // Reentrancy protection
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";         // Reentrancy protection
 import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";         // ECDSA utilities
 import "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";   // Merkle proof verification
 
@@ -754,3 +754,4 @@ contract IPLicensingVault is Ownable, ReentrancyGuard {
         emit MonthlyVaultPowerAnnounced(epoch, y, m, ts, alloc);
     }
 }
+
