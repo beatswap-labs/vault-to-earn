@@ -1,0 +1,20 @@
+{
+  "name": "vault-to-earn",
+  "version": "1.0.0",
+  "description": "Vault-to-Earn: USDT based IP licensing vault and BTX reward DApp on BNB",
+  "license": "MIT",
+  "scripts": {
+    "compile": "hardhat compile",
+    "test": "hardhat test",
+    "lint:sol": "solhint 'opbnb/contracts/**/*.sol'"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^5.0.0",
+    "dotenv": "^16.4.0",
+    "hardhat": "^2.22.0",
+    "solhint": "^3.6.2"
+  },
+  "dependencies": {
+    "@openzeppelin/contracts": "^5.0.0"
+  }
+}
