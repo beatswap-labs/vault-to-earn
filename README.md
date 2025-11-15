@@ -30,7 +30,7 @@ You can also use the Hardhat local network for development and testing.
 
 | Network      | Contract Name       | Address         |
 | ------------ | ------------------- | --------------- |
-| opBNB Mainnet | IPLicensingVault   | `TBD`           |
+| BNB Mainnet | IPLicensingVault   | `TBD`           |
 
 - Deposit Token: USDT compatible ERC20
 - Reward Token: BTX compatible ERC20
