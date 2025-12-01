@@ -74,7 +74,10 @@ contract IPLicensingVault is Ownable, ReentrancyGuard {
     }
 
     // ---------------- Access / Wiring ----------------
-    address public projectTreasury;                     // Treasury that ultimately receives IDO funds
+    // Project treasury address used for off-chain tracking and event tagging.
+    // Actual USDT flows for IDO participation are handled inside the IIDOLauncher contract.
+    address public projectTreasury;
+
     mapping(address => bool) public isRelayer;          // Authorized relayers
     mapping(address => bool) public isApprovedIdo;      // Approved IDO contracts
     mapping(bytes32 => address) public idoOf;           // rightId → IDO contract
@@ -107,6 +110,7 @@ contract IPLicensingVault is Ownable, ReentrancyGuard {
     uint256 public totalConsumedForRoyaltyAll;          // Sum of all consumption backing royalties
     uint256 public totalRoyaltyPaidAll;                 // Total USDT royalties paid out
     uint256 public totalRoyaltyAllocatedAll;            // Total royalties allocated into buffers
+    uint256 public totalIdoConsumed;            // IDO consumption counter (information-only; excluded from royalty pool)
 
     event ConsumedSynced(address indexed user, uint256 newCumulative, uint128 deltaConsumed);
     event RoyaltyAllocated(address indexed rightsHolder, uint256 amount);
@@ -535,7 +539,7 @@ contract IPLicensingVault is Ownable, ReentrancyGuard {
         address indexed user,
         uint128 usdtAmount,
         address indexed ido,
-        address indexed projectTreasury
+        address indexed projectTreasury  // off-chain tracking only
     );
 
     // Relayer-triggered IDO participation using reserved funds
@@ -546,6 +550,9 @@ contract IPLicensingVault is Ownable, ReentrancyGuard {
     ) external nonReentrant whenNotPaused onlyRelayer {
         if (user == address(0)) revert ErrZeroAddress();
         if (usdtAmount == 0) revert ErrAmountZero();
+
+        // Require projectTreasury to be configured
+        // even though IDO flows are handled inside IIDOLauncher.
         if (projectTreasury == address(0)) revert ErrTreasuryUnset();
 
         address ido = idoOf[rightId];
@@ -567,7 +574,7 @@ contract IPLicensingVault is Ownable, ReentrancyGuard {
             totalDeposits -= usdtAmount;
             a.reservedConsumed =
                 uint128(uint256(a.reservedConsumed) + usdtAmount);
-            totalConsumedForRoyaltyAll += usdtAmount;
+            totalIdoConsumed += usdtAmount;  // statistics-only counter
         }
 
         emit IdoParticipated(user, uint128(usdtAmount), ido, projectTreasury);
@@ -642,7 +649,8 @@ contract IPLicensingVault is Ownable, ReentrancyGuard {
         if (root == bytes32(0)) revert ErrRootNotSet();
 
         // Use abi.encode to preserve explicit types and lengths in the leaf
-        bytes32 leaf = keccak256(abi.encode(msg.sender, amount));
+        // Include epoch in the leaf to prevent cross-epoch replay
+        bytes32 leaf = keccak256(abi.encode(epoch, msg.sender, amount));
         if (!MerkleProof.verify(proof, root, leaf)) revert ErrBadProof();
 
         uint256 already = btxClaimed[epoch][msg.sender];
@@ -754,4 +762,3 @@ contract IPLicensingVault is Ownable, ReentrancyGuard {
         emit MonthlyVaultPowerAnnounced(epoch, y, m, ts, alloc);
     }
 }
-
