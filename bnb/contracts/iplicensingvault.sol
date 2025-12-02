@@ -43,6 +43,7 @@ contract IPLicensingVault is Ownable, ReentrancyGuard {
     error ErrExpired();
     error ErrConsumedDecrease();
     error ErrConsumedOverReserve();
+    error ErrArrayLengthMismatch();
     error ErrRoyaltyDecrease();
     error ErrRoyaltyOverBudget();
     error ErrExceedsExcessUSDT();
@@ -421,18 +422,25 @@ contract IPLicensingVault is Ownable, ReentrancyGuard {
         emit ReservedChanged(user, a.reservedTotal, a.reservedConsumed);
     }
 
-    function decreaseReserved(uint256 amount) external nonReentrant {
+    function decreaseReserved(
+        uint256 amount,
+        uint256 newCumConsumed,
+        uint256 windowId,
+        uint256 deadline,
+        bytes calldata sig
+    ) external nonReentrant whenNotPaused {
         if (amount == 0) revert ErrAmountZero();
         address user = msg.sender;
         Account storage a = accounts[user];
-
         _accumulate(user);
+        _applyConsumedSigned(user, newCumConsumed, windowId, deadline, sig);
 
         uint256 ra = _reservedAvail(a);
-        if (amount > ra) revert ErrInsufficient();
+        uint256 actualDecrease = amount > ra ? ra : amount;
+        if (actualDecrease == 0) revert ErrAmountZero();
 
         unchecked {
-            a.reservedTotal = uint128(uint256(a.reservedTotal) - amount);
+            a.reservedTotal = uint128(uint256(a.reservedTotal) - actualDecrease);
         }
         emit ReservedChanged(user, a.reservedTotal, a.reservedConsumed);
     }
@@ -484,16 +492,6 @@ contract IPLicensingVault is Ownable, ReentrancyGuard {
         emit ConsumedSynced(user, newCumConsumed, uint128(delta));
     }
 
-    function syncConsumedSigned(
-        address user,
-        uint256 newCumConsumed,
-        uint256 windowId,
-        uint256 deadline,
-        bytes calldata sig
-    ) external nonReentrant whenNotPaused {
-        _applyConsumedSigned(user, newCumConsumed, windowId, deadline, sig);
-    }
-
     function syncConsumedAndWithdraw(
         uint256 withdrawAmount,
         uint256 newCumConsumed,
@@ -534,6 +532,38 @@ contract IPLicensingVault is Ownable, ReentrancyGuard {
         emit Withdraw(user, uint128(fromDeposit));
     }
 
+    function batchSyncConsumedSigned(
+        address[] calldata users,
+        uint256[] calldata newCumConsumed,
+        uint256[] calldata windowIds,
+        uint256[] calldata deadlines,
+        bytes[] calldata sigs
+    ) external nonReentrant whenNotPaused {
+        uint256 len = users.length;
+        if (
+            len == 0 ||
+            newCumConsumed.length != len ||
+            windowIds.length != len ||
+            deadlines.length != len ||
+            sigs.length != len
+        ) {
+            revert ErrArrayLengthMismatch();
+        }
+
+        for (uint256 i = 0; i < len; ) {
+            _applyConsumedSigned(
+                users[i],
+                newCumConsumed[i],
+                windowIds[i],
+                deadlines[i],
+                sigs[i]
+            );
+            unchecked {
+                ++i;
+            }
+        }
+    }
+
     // ---------------- IDO: participate with Stateless Allowance ----------------
     event IdoParticipated(
         address indexed user,
@@ -572,8 +602,8 @@ contract IPLicensingVault is Ownable, ReentrancyGuard {
         unchecked {
             a.balance = uint128(bal - usdtAmount);
             totalDeposits -= usdtAmount;
-            a.reservedConsumed =
-                uint128(uint256(a.reservedConsumed) + usdtAmount);
+            uint256 newReservedTotal = uint256(a.reservedTotal) - usdtAmount;
+            a.reservedTotal = uint128(newReservedTotal);
             totalIdoConsumed += usdtAmount;  // statistics-only counter
         }
 
